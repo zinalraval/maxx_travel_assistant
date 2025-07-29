@@ -14,7 +14,7 @@ CITY_TO_IATA = {
     "chicago": "CHI", "sydney": "SYD"
 }
 
-BASE_URL = "https://2cc455d42afb.ngrok-free.app"  # Replace with your latest NGROK or server
+BASE_URL = "https://maxx-travel-assistant.onrender.com"  
 
 def extract_info(text):
     text = text.lower()
