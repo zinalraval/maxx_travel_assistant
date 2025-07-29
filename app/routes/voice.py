@@ -8,19 +8,18 @@ from dateutil import parser as date_parser
 
 router = APIRouter()
 
-BASE_URL = "https://maxx-travel-assistant.onrender.com"
-
-# Static fallback city-to-IATA
 CITY_TO_IATA = {
-    "mumbai": "BOM", "delhi": "DEL", "dubai": "DXB", "london": "LON",
-    "new york": "NYC", "paris": "PAR", "tokyo": "TYO", "bangalore": "BLR",
-    "singapore": "SIN", "chicago": "CHI", "sydney": "SYD"
+    "mumbai": "BOM", "delhi": "DEL", "dubai": "DXB",
+    "london": "LON", "new york": "NYC", "paris": "PAR",
+    "tokyo": "TYO", "bangalore": "BLR", "singapore": "SIN",
+    "chicago": "CHI", "sydney": "SYD"
 }
+
+BASE_URL = "https://maxx-travel-assistant.onrender.com"
 
 AMADEUS_API_KEY = os.getenv("AMADEUS_API_KEY")
 AMADEUS_API_SECRET = os.getenv("AMADEUS_API_SECRET")
 
-# Token and IATA cache
 AMAD_TOKEN = {"access_token": None, "expires_at": None}
 IATA_CACHE = {}
 
@@ -58,11 +57,13 @@ def resolve_city_to_iata(city: str):
             params={"keyword": city, "subType": "CITY"}
         )
         if r.status_code == 200 and r.json().get("data"):
-            iata_code = r.json()["data"][0]["iataCode"]
-            IATA_CACHE[city] = iata_code
-            return iata_code
-    except:
-        pass
+            for location in r.json()["data"]:
+                if location.get("iataCode") and location.get("subType") == "CITY":
+                    iata_code = location["iataCode"]
+                    IATA_CACHE[city] = iata_code
+                    return iata_code
+    except Exception as e:
+        print(f"Error resolving city to IATA: {e}")
 
     return None
 
@@ -70,25 +71,29 @@ def extract_info(text: str):
     text = text.lower()
     origin, destination, city, date_str = None, None, None, None
 
-    # Flight: "from ___ to ___"
-    flight_match = re.search(r"from ([a-z\s]+?) to ([a-z\s]+)", text)
+    # Enhanced regex to capture airport names or city names after "from" and "to"
+    flight_match = re.search(r"from ([a-z\s]+?(?:airport)?) to ([a-z\s]+?(?:airport)?)", text)
     if flight_match:
-        origin = flight_match.group(1).strip()
-        destination = flight_match.group(2).strip()
+        origin = flight_match.group(1).replace("airport", "").strip()
+        destination = flight_match.group(2).replace("airport", "").strip()
+    else:
+        # Fallback: capture city names without airport keyword
+        flight_match = re.search(r"from ([a-z\s]+) to ([a-z\s]+)", text)
+        if flight_match:
+            origin = flight_match.group(1).strip()
+            destination = flight_match.group(2).strip()
 
-    # Hotel: "hotel in ___" or "stay in ___"
     hotel_match = re.search(r"(?:hotel|stay|book) in ([a-z\s]+)", text)
     if hotel_match:
         city = hotel_match.group(1).strip()
 
-    # Date
     try:
         date = date_parser.parse(text, fuzzy=True, default=datetime.now())
         if date < datetime.now():
             date += timedelta(days=1)
         date_str = date.strftime("%Y-%m-%d")
     except:
-        pass
+        date_str = None
 
     return origin, destination, city, date_str
 
@@ -108,13 +113,11 @@ async def voice_webhook(request: Request):
         session = voice_webhook.sessions.get(user_id, {"state": "start"})
         response_text = ""
 
-        # Always try to extract data early
         origin, destination, city, date_str = extract_info(voice_text)
 
         def unknown_city_msg(city_name):
             return f"I couldn’t find a match for '{city_name}'. Please try again with a nearby city."
 
-        # --- Handle FLIGHT ---
         if origin and destination and date_str:
             origin_code = resolve_city_to_iata(origin)
             destination_code = resolve_city_to_iata(destination)
@@ -137,16 +140,18 @@ async def voice_webhook(request: Request):
                     "flight": flight
                 })
                 response_text = (
-                    f"Found a flight from {origin.title()} to {destination.title()} on {date_str}. "
-                    f"Departs at {flight['departure']['at']}, airline {flight['carrier_code']}, "
-                    f"₹{flight['price']['total']}. Want to book it?"
+                    f"Great! I found a flight from {origin.title()} to {destination.title()} on {date_str}. "
+                    f"It departs at {flight['departure']['at']} with {flight['carrier_code']}, "
+                    f"and costs ₹{flight['price']['total']}. Shall I book it for you?"
                 )
                 voice_webhook.sessions[user_id] = session
                 return JSONResponse(content={"response_text": response_text})
             else:
                 response_text = "Sorry, no flights found for that route and date."
+        elif origin and destination and not date_str:
+            response_text = "Got your cities. Please tell me the date you'd like to travel."
+            session.update({"origin": origin, "destination": destination, "state": "awaiting_date"})
 
-        # --- Handle HOTEL ---
         elif city and date_str:
             city_code = resolve_city_to_iata(city)
             if not city_code:
@@ -174,7 +179,6 @@ async def voice_webhook(request: Request):
             else:
                 response_text = "Sorry, no hotels found for that city and date."
 
-        # --- Handle Flight Confirm ---
         elif session["state"] == "flight_found":
             if "yes" in voice_text.lower():
                 amount = session["flight"]["price"]
@@ -190,7 +194,6 @@ async def voice_webhook(request: Request):
                 response_text = "Okay, let me know if you'd like to search another flight."
                 session["state"] = "awaiting_input"
 
-        # --- Handle Hotel Confirm ---
         elif session["state"] == "hotel_found":
             if "yes" in voice_text.lower():
                 amount = session["hotel"]["price"]
@@ -207,7 +210,6 @@ async def voice_webhook(request: Request):
                 session["state"] = "awaiting_input"
 
         else:
-            # Improved fallback
             response_text = (
                 "Could you please tell me the city and date again? "
                 "Say things like ‘Book flight from Mumbai to Dubai on August 20’ "
