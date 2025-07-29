@@ -54,11 +54,11 @@ def resolve_city_to_iata(city: str):
         r = requests.get(
             "https://test.api.amadeus.com/v1/reference-data/locations",
             headers={"Authorization": f"Bearer {token}"},
-            params={"keyword": city, "subType": "CITY"}
+            params={"keyword": city, "subType": "CITY,AIRPORT"}
         )
         if r.status_code == 200 and r.json().get("data"):
             for location in r.json()["data"]:
-                if location.get("iataCode") and location.get("subType") == "CITY":
+                if location.get("iataCode") and location.get("subType") in ["CITY", "AIRPORT"]:
                     iata_code = location["iataCode"]
                     IATA_CACHE[city] = iata_code
                     return iata_code
