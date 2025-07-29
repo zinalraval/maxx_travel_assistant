@@ -97,7 +97,7 @@ def extract_info(text: str):
 
     return origin, destination, city, date_str
 
-@router.post("voice-webhook")
+@router.post("/voice/voice-webhook")
 async def voice_webhook(request: Request):
     try:
         data = await request.json()
