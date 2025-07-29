@@ -2,101 +2,108 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 import re
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from dateutil import parser as date_parser
 
 router = APIRouter()
 
+BASE_URL = "https://maxx-travel-assistant.onrender.com"
+
+# Popular cities mapped to IATA airport codes
 CITY_TO_IATA = {
-    "mumbai": "BOM", "delhi": "DEL", "dubai": "DXB",
-    "london": "LON", "new york": "NYC", "paris": "PAR",
-    "tokyo": "TYO", "bangalore": "BLR", "singapore": "SIN",
-    "chicago": "CHI", "sydney": "SYD"
+    "mumbai": "BOM", "delhi": "DEL", "dubai": "DXB", "london": "LON",
+    "new york": "NYC", "paris": "PAR", "tokyo": "TYO", "bangalore": "BLR",
+    "singapore": "SIN", "chicago": "CHI", "sydney": "SYD"
 }
 
-BASE_URL = "https://maxx-travel-assistant.onrender.com"  
-
-def extract_info(text):
+# Helper: extract info from user sentence
+def extract_info(text: str):
     text = text.lower()
-    origin, destination, date_str, city_code = None, None, None, None
+    origin, destination, city, date_str = None, None, None, None
 
-    flight_match = re.search(r"from ([a-zA-Z\s]+?) to ([a-zA-Z\s]+)", text)
+    # Flight pattern: "from mumbai to dubai"
+    flight_match = re.search(r"from ([a-z\s]+?) to ([a-z\s]+)", text)
     if flight_match:
         origin = flight_match.group(1).strip()
         destination = flight_match.group(2).strip()
 
-    hotel_match = re.search(r"(?:hotels?|stay) in ([a-zA-Z\s]+)", text)
+    # Hotel pattern: "hotel in paris"
+    hotel_match = re.search(r"(?:hotel|stay|book) in ([a-z\s]+)", text)
     if hotel_match:
-        city_code = hotel_match.group(1).strip()
+        city = hotel_match.group(1).strip()
 
-    for keyword in ["today", "tomorrow", "next", "on"]:
-        if keyword in text:
-            try:
-                parsed_date = date_parser.parse(text, fuzzy=True, default=datetime.now())
-                date_str = parsed_date.strftime("%Y-%m-%d")
-                break
-            except:
-                pass
+    # Date detection using fuzzy parsing
+    try:
+        date = date_parser.parse(text, fuzzy=True, default=datetime.now())
+        if date < datetime.now():
+            date += timedelta(days=1)  # Ensure future date
+        date_str = date.strftime("%Y-%m-%d")
+    except:
+        pass
 
-    return origin, destination, date_str, city_code
+    return origin, destination, city, date_str
 
-@router.post("/voice-webhook")
+@router.post("/voice/voice-webhook")
 async def voice_webhook(request: Request):
     try:
         data = await request.json()
         voice_text = data.get("voice_text", "")
-        user_id = data.get("user_id", "default")
+        user_id = data.get("user_id", "anonymous")
 
+        if not voice_text:
+            return JSONResponse(content={"response_text": "I didn't catch that. Could you please repeat?"})
+
+        # In-memory session tracking
         if not hasattr(voice_webhook, "sessions"):
             voice_webhook.sessions = {}
 
         session = voice_webhook.sessions.get(user_id, {"state": "start"})
         response_text = ""
 
-        if not voice_text:
-            return JSONResponse(content={"response_text": "I didn't hear anything. Please repeat."})
-
         if session["state"] == "start":
             response_text = (
                 "Hi! I’m Maxx, your AI travel assistant. "
                 "You can say things like ‘Book flight from Mumbai to Dubai on August 15’ or "
-                "‘Find hotels in Paris from August 10 to 15’. What would you like to do?"
+                "‘Find hotels in Paris tomorrow’. What would you like to do?"
             )
-            session["state"] = "awaiting_info"
+            session["state"] = "awaiting_input"
 
-        elif session["state"] == "awaiting_info":
-            origin, destination, date_str, city_code = extract_info(voice_text)
+        elif session["state"] == "awaiting_input":
+            origin, destination, city, date_str = extract_info(voice_text)
 
             # Flight intent
             if origin and destination and date_str:
-                origin_iata = CITY_TO_IATA.get(origin.lower())
-                destination_iata = CITY_TO_IATA.get(destination.lower())
+                origin_code = CITY_TO_IATA.get(origin.lower())
+                destination_code = CITY_TO_IATA.get(destination.lower())
 
-                if origin_iata and destination_iata:
-                    flight_url = f"{BASE_URL}/booking/flights"
-                    r = requests.get(flight_url, params={"origin": origin_iata, "destination": destination_iata, "date": date_str, "session_id": user_id})
+                if origin_code and destination_code:
+                    r = requests.get(f"{BASE_URL}/booking/flights", params={
+                        "origin": origin_code,
+                        "destination": destination_code,
+                        "date": date_str,
+                        "session_id": user_id
+                    })
                     if r.status_code == 200 and r.json().get("flights"):
                         flight = r.json()["flights"][0]
                         session["state"] = "flight_found"
-                        session["flight_data"] = flight
+                        session["flight"] = flight
                         response_text = (
                             f"Found a flight from {origin.title()} to {destination.title()} on {date_str}. "
-                            f"Departure at {flight['departure']['at']} with {flight['carrier_code']} "
-                            f"for ₹{flight['price']['total']}. Want to book it?"
+                            f"Departure at {flight['departure']['at']}, airline {flight['carrier_code']}, "
+                            f"total ₹{flight['price']['total']}. Want to book it?"
                         )
                     else:
                         response_text = "Sorry, I couldn't find any flights for that route and date."
 
                 else:
-                    response_text = "Sorry, I only support popular cities like Mumbai, Dubai, London, and New York."
+                    response_text = "Sorry, those cities aren't supported yet. Try Mumbai, Delhi, Dubai, etc."
 
             # Hotel intent
-            elif city_code and date_str:
-                iata_city = CITY_TO_IATA.get(city_code.lower())
-                if iata_city:
-                    hotel_url = f"{BASE_URL}/booking/hotels"
-                    r = requests.get(hotel_url, params={
-                        "city_code": iata_city,
+            elif city and date_str:
+                city_code = CITY_TO_IATA.get(city.lower())
+                if city_code:
+                    r = requests.get(f"{BASE_URL}/booking/hotels", params={
+                        "city_code": city_code,
                         "check_in_date": date_str,
                         "check_out_date": date_str,
                         "adults": 1,
@@ -105,45 +112,57 @@ async def voice_webhook(request: Request):
                     if r.status_code == 200 and r.json().get("hotels"):
                         hotel = r.json()["hotels"][0]
                         session["state"] = "hotel_found"
-                        session["hotel_data"] = hotel
+                        session["hotel"] = hotel
                         response_text = (
-                            f"I found a hotel in {city_code.title()} for {date_str}. "
-                            f"{hotel['name']}, priced at ₹{hotel['price']}. Want to book it?"
+                            f"I found a hotel in {city.title()} on {date_str}. "
+                            f"{hotel['name']}, priced at ₹{hotel['price']}. Do you want to book it?"
                         )
                     else:
-                        response_text = "No hotels found for that city and date."
+                        response_text = "Sorry, no hotels found for that city and date."
                 else:
-                    response_text = "Sorry, hotel search is only available in major cities."
+                    response_text = "Sorry, I can only search hotels in major cities."
 
             else:
-                response_text = "Please say your travel plan clearly. For example, 'Book flight from Delhi to Dubai on August 20'."
+                response_text = (
+                    "I didn’t understand your request fully. "
+                    "Try saying 'Book flight from Delhi to Dubai on August 20'."
+                )
 
         elif session["state"] == "flight_found":
             if "yes" in voice_text.lower():
-                # Start payment process
-                r = requests.post(f"{BASE_URL}/booking/pay", json={"amount": session["flight_data"]["price"], "currency": "usd", "session_id": user_id})
-                payment_url = r.json().get("checkout_url", "https://example.com/pay")
-                response_text = f"Great! Please complete your payment here: {payment_url}"
+                amount = session["flight"]["price"]
+                r = requests.post(f"{BASE_URL}/booking/pay", json={
+                    "amount": amount,
+                    "currency": "usd",
+                    "session_id": user_id
+                })
+                url = r.json().get("checkout_url", "")
+                response_text = f"Awesome! Please complete payment here: {url}"
                 session["state"] = "start"
             else:
-                response_text = "Got it! Let me know if you'd like to search another flight."
-                session["state"] = "awaiting_info"
+                response_text = "Okay, let me know if you'd like to search another flight."
+                session["state"] = "awaiting_input"
 
         elif session["state"] == "hotel_found":
             if "yes" in voice_text.lower():
-                r = requests.post(f"{BASE_URL}/booking/pay", json={"amount": session["hotel_data"]["price"], "currency": "usd", "session_id": user_id})
-                payment_url = r.json().get("checkout_url", "https://example.com/pay")
-                response_text = f"Awesome! Complete your booking by paying here: {payment_url}"
+                amount = session["hotel"]["price"]
+                r = requests.post(f"{BASE_URL}/booking/pay", json={
+                    "amount": amount,
+                    "currency": "usd",
+                    "session_id": user_id
+                })
+                url = r.json().get("checkout_url", "")
+                response_text = f"Great! Complete your booking here: {url}"
                 session["state"] = "start"
             else:
-                response_text = "Okay. Let me know if you want to find another hotel."
-                session["state"] = "awaiting_info"
+                response_text = "Okay, let me know if you'd like to find another hotel."
+                session["state"] = "awaiting_input"
 
         else:
-            response_text = "I'm here to help you book travel. Say something like 'Book a hotel in Paris next week'."
+            response_text = "I'm Maxx! Say something like 'Find flights to London next week.'"
 
         voice_webhook.sessions[user_id] = session
         return JSONResponse(content={"response_text": response_text})
 
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"response_text": f"Error: {str(e)}"})
