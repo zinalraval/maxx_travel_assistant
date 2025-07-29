@@ -1,0 +1,1 @@
+# maxx_travel_assistant
