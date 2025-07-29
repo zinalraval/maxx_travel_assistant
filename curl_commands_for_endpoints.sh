@@ -12,7 +12,7 @@ curl -X POST "${BASE_URL}/booking/pay" -H "Content-Type: application/json" -d '{
 echo -e "\n"
 
 echo "Testing GET /booking/hotels"
-curl -X GET "${BASE_URL}/booking/hotels?city_code=LON&check_in_date=2025-08-15&check_out_date=2024-07-15&adults=2&session_id=testsession" -H "Accept: application/json"
+curl -X GET "${BASE_URL}/booking/hotels?city_code=LON&check_in_date=2025-08-15&check_out_date=2025-08-20&adults=2&session_id=testsession" -H "Accept: application/json"
 echo -e "\n"
 
 echo "Testing POST /booking/flight-book"
