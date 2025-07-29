@@ -1,0 +1,64 @@
+[
+  {
+    "tool_name": "search_flights",
+    "description": "Search available flights using user input",
+    "method": "GET",
+    "endpoint_url": "https://2cc455d42afb.ngrok-free.app/booking/flights?origin={origin}&destination={destination}&date={date}&session_id={session_id}",
+    "request_body_template": null,
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  {
+    "tool_name": "search_hotels",
+    "description": "Search available hotels using user input",
+    "method": "GET",
+    "endpoint_url": "https://2cc455d42afb.ngrok-free.app/booking/hotels?city_code={city_code}&check_in_date={check_in}&check_out_date={check_out}&adults={adults}&session_id={session_id}",
+    "request_body_template": null,
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  {
+    "tool_name": "flight_booking",
+    "description": "Book a flight with provided booking details",
+    "method": "POST",
+    "endpoint_url": "https://2cc455d42afb.ngrok-free.app/booking/flight-book",
+    "request_body_template": {
+      "flight_offer": "{flight_offer}",
+      "traveler_info": "{traveler_info}",
+      "session_id": "{session_id}"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  {
+    "tool_name": "hotel_booking",
+    "description": "Book a hotel with provided booking details",
+    "method": "POST",
+    "endpoint_url": "https://2cc455d42afb.ngrok-free.app/booking/hotel-book",
+    "request_body_template": {
+      "hotel_offer": "{hotel_offer}",
+      "guests": "{guests}",
+      "session_id": "{session_id}"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  {
+    "tool_name": "create_payment",
+    "description": "Create a payment session for booking",
+    "method": "POST",
+    "endpoint_url": "https://2cc455d42afb.ngrok-free.app/booking/pay",
+    "request_body_template": {
+      "amount": "{amount}",
+      "currency": "usd",
+      "session_id": "{session_id}"
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+]

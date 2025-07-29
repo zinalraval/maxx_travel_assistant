@@ -1,0 +1,63 @@
+{
+  "booking_data": {
+    "hotel": {
+      "hotelId": "H12345",
+      "chainCode": "HC",
+      "name": "Sample Hotel",
+      "rating": "4",
+      "address": {
+        "lines": ["123 Sample St"],
+        "cityName": "New York",
+        "postalCode": "10001",
+        "countryCode": "US"
+      }
+    },
+    "stay": {
+      "checkInDate": "2025-08-15",
+      "checkOutDate": "2025-08-20",
+      "guestCount": {
+        "adultCount": 1,
+        "childCount": 0
+      }
+    },
+    "rooms": [
+      {
+        "type": "standard",
+        "ratePlanCode": "RP123",
+        "guests": [
+          {
+            "name": {
+              "firstName": "John",
+              "lastName": "Doe"
+            },
+            "age": 30
+          }
+        ]
+      }
+    ]
+  },
+  "guests": [
+    {
+      "name": {
+        "firstName": "John",
+        "lastName": "Doe"
+      },
+      "contact": {
+        "email": "john.doe@example.com",
+        "phone": "1234567890"
+      }
+    }
+  ],
+  "payments": [
+    {
+      "method": "credit_card",
+      "card": {
+        "number": "4111111111111111",
+        "expiryMonth": "12",
+        "expiryYear": "2025",
+        "cvv": "123",
+        "holderName": "John Doe"
+      }
+    }
+  ]
+}

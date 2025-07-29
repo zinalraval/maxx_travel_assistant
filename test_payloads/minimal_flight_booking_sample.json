@@ -1,0 +1,90 @@
+{
+  "order_data": {
+    "type": "flight-order",
+    "flightOffers": [
+      {
+        "type": "flight-offer",
+        "id": "1",
+        "source": "GDS",
+        "instantTicketingRequired": false,
+        "nonHomogeneous": false,
+        "oneWay": false,
+        "lastTicketingDate": "2025-07-26",
+        "itineraries": [
+          {
+            "duration": "PT7H",
+            "segments": [
+              {
+                "departure": {
+                  "iataCode": "JFK",
+                  "terminal": "1",
+                  "at": "2025-08-15T22:05:00"
+                },
+                "arrival": {
+                  "iataCode": "LHR",
+                  "terminal": "2",
+                  "at": "2025-08-16T10:05:00"
+                },
+                "carrierCode": "BA",
+                "number": "178",
+                "aircraft": {
+                  "code": "777"
+                },
+                "duration": "PT7H",
+                "numberOfStops": 0
+              }
+            ]
+          }
+        ],
+        "price": {
+          "currency": "USD",
+          "total": "500.00"
+        },
+        "travelerPricings": [
+          {
+            "travelerId": "1",
+            "fareOption": "STANDARD",
+            "travelerType": "ADULT",
+            "price": {
+              "currency": "USD",
+              "total": "500.00"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "travelers": [
+    {
+      "id": "1",
+      "dateOfBirth": "1990-01-01",
+      "name": {
+        "firstName": "John",
+        "lastName": "Doe"
+      },
+      "gender": "MALE",
+      "contact": {
+        "emailAddress": "john.doe@example.com",
+        "phones": [
+          {
+            "deviceType": "MOBILE",
+            "countryCallingCode": "1",
+            "number": "1234567890"
+          }
+        ]
+      },
+      "documents": [
+        {
+          "documentType": "PASSPORT",
+          "number": "123456789",
+          "expiryDate": "2030-01-01",
+          "issuanceCountry": "US",
+          "birthPlace": "New York",
+          "issuanceDate": "2020-01-01",
+          "nationality": "US",
+          "holder": true
+        }
+      ]
+    }
+  ]
+}

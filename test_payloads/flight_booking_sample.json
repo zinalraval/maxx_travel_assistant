@@ -1,0 +1,112 @@
+{
+  "user_name": "John Doe",
+  "email": "john.doe@example.com",
+  "phone": "1234567890",
+  "order_data": {
+    "type": "flight-order",
+    "flightOffers": [
+      {
+        "type": "flight-offer",
+        "id": "1",
+        "source": "GDS",
+        "instantTicketingRequired": false,
+        "nonHomogeneous": false,
+        "oneWay": false,
+        "lastTicketingDate": "2025-07-26",
+        "itineraries": [
+          {
+            "duration": "PT14H40M",
+            "segments": [
+              {
+                "departure": {
+                  "iataCode": "JFK",
+                  "terminal": "1",
+                  "at": "2025-08-15T22:05:00"
+                },
+                "arrival": {
+                  "iataCode": "LIS",
+                  "terminal": "1",
+                  "at": "2025-08-16T10:05:00"
+                },
+                "carrierCode": "TP",
+                "number": "210",
+                "aircraft": {
+                  "code": "332"
+                },
+                "duration": "PT7H",
+                "numberOfStops": 0
+              },
+              {
+                "departure": {
+                  "iataCode": "LIS",
+                  "terminal": "1",
+                  "at": "2025-08-16T15:00:00"
+                },
+                "arrival": {
+                  "iataCode": "LHR",
+                  "terminal": "2",
+                  "at": "2025-08-16T17:45:00"
+                },
+                "carrierCode": "TP",
+                "number": "1350",
+                "aircraft": {
+                  "code": "32N"
+                },
+                "duration": "PT2H45M",
+                "numberOfStops": 0
+              }
+            ]
+          }
+        ],
+        "price": {
+          "currency": "EUR",
+          "total": "178.40"
+        },
+        "travelerPricings": [
+          {
+            "travelerId": "1",
+            "fareOption": "STANDARD",
+            "travelerType": "ADULT",
+            "price": {
+              "currency": "EUR",
+              "total": "178.40"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "travelers": [
+    {
+      "id": "1",
+      "dateOfBirth": "1990-01-01",
+      "name": {
+        "firstName": "John",
+        "lastName": "Doe"
+      },
+      "gender": "MALE",
+      "contact": {
+        "emailAddress": "john.doe@example.com",
+        "phones": [
+          {
+            "deviceType": "MOBILE",
+            "countryCallingCode": "1",
+            "number": "1234567890"
+          }
+        ]
+      },
+      "documents": [
+        {
+          "documentType": "PASSPORT",
+          "number": "123456789",
+          "expiryDate": "2030-01-01",
+          "issuanceCountry": "US",
+          "birthPlace": "New York",
+          "issuanceDate": "2020-01-01",
+          "nationality": "US",
+          "holder": true
+        }
+      ]
+    }
+  ]
+}
