@@ -55,6 +55,7 @@ python-dateutil
 requests
 fastapi
 uvicorn[standard]
+dateparser
 amadeus
 stripe
 python-dotenv
