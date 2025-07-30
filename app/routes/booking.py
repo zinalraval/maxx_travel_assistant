@@ -9,6 +9,7 @@ from app.db.session import SessionLocal
 from app.models.booking import Booking
 from app.schemas.booking import BookingCreate, FlightBookingRequest, HotelBookingRequest
 from sqlalchemy.orm import Session
+from datetime import datetime
 import logging
 
 from app.services.amadeus_service import get_valid_city_codes
