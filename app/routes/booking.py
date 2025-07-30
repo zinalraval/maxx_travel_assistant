@@ -28,9 +28,9 @@ class PaymentRequest(BaseModel):
 
 @router.get("/flights")
 def get_flights(
-    origin: str = Query(...),
-    destination: str = Query(...),
-    date: str = Query(...),
+    origin: str = Query(..., alias="originLocationCode"),
+    destination: str = Query(..., alias="destinationLocationCode"),
+    date: str = Query(..., alias="departureDate"),
     session_id: str = Query(...)
 ):
     try:
