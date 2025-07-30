@@ -34,31 +34,36 @@ def get_flights(
     session_id: str = Query(...)
 ):
     try:
-        # Normalize city codes for flight search
+        # Normalize common city codes
         city_code_map = {
-            "LON": "LHR",  # London Heathrow instead of Gatwick
-            "NYC": "JFK",  # New York JFK
-            "DEL": "DEL",
-            "BOM": "BOM",
-            "DXB": "DXB",
-            "PAR": "CDG",  # Paris Charles de Gaulle
-            "IST": "IST",
-            "MAN": "MAN",
-            "SFO": "SFO",
-            "SIN": "SIN"
+            "LON": "LHR", "NYC": "JFK", "PAR": "CDG",
+            "DEL": "DEL", "BOM": "BOM", "DXB": "DXB",
+            "IST": "IST", "MAN": "MAN", "SFO": "SFO", "SIN": "SIN"
         }
         normalized_origin = city_code_map.get(origin.upper(), origin.upper())
         normalized_destination = city_code_map.get(destination.upper(), destination.upper())
 
+        # Ensure date is not in the past
+        try:
+            travel_date = datetime.strptime(date, "%Y-%m-%d").date()
+            today = datetime.utcnow().date()
+            if travel_date < today:
+                logger.warning(f"Past date provided: {date}")
+                return {"error": f"Cannot search flights in the past: {date}"}
+        except Exception as date_error:
+            logger.error(f"Invalid date format: {date} - {date_error}")
+            return {"error": "Invalid date format. Use YYYY-MM-DD."}
+
         flights = search_flights(normalized_origin, normalized_destination, date)
         if not flights:
             logger.warning(f"No flights found for {normalized_origin} to {normalized_destination} on {date}")
-            return {"error": "No flights found"}
+            return {"error": f"No flights found for {normalized_origin} to {normalized_destination} on {date}"}
+
         return {"flights": flights}
     except Exception as e:
         logger.error(f"Error searching flights: {e}")
         return {"error": "Failed to search flights"}
-
+        
 @router.post("/pay")
 def initiate_payment(payment_request: PaymentRequest):
     try:
