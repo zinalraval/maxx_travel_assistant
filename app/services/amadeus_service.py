@@ -1,38 +1,82 @@
 from amadeus import Client, ResponseError
 from app.config import settings
+import os
+from datetime import datetime, timedelta
+from typing import Optional
+from dotenv import load_dotenv
 
+load_dotenv()
+
+AMADEUS_CLIENT_ID = os.getenv("AMADEUS_CLIENT_ID")
+AMADEUS_CLIENT_SECRET = os.getenv("AMADEUS_CLIENT_SECRET")
+AMADEUS_ENV = os.getenv("AMADEUS_ENV", "test")  # or "production"
 
 amadeus = Client(
-    client_id=settings.AMADEUS_CLIENT_ID,
-    client_secret=settings.AMADEUS_CLIENT_SECRET
+    client_id=AMADEUS_CLIENT_ID,
+    client_secret=AMADEUS_CLIENT_SECRET,
+    hostname="production" if AMADEUS_ENV == "production" else "test",
 )
 
-def search_flights(origin, destination, departure_date):
+USE_MOCK_FLIGHT_SEARCH = os.getenv("USE_MOCK_FLIGHT_SEARCH", "true").lower() == "true"
+USE_MOCK_HOTEL_SEARCH = os.getenv("USE_MOCK_HOTEL_SEARCH", "true").lower() == "true"
+
+
+def city_to_iata_code(city_name: str) -> Optional[str]:
+    """
+    Use Amadeus API to dynamically find IATA code for a given city.
+    """
     try:
-        if USE_MOCK_HOTEL_SEARCH:
-            print("Using mock flight search data due to sandbox or limited API plan.")
-            return [
-                {
-                    "type": "flight-offer",
-                    "id": "mock1",
-                    "source": "MOCK",
-                    "itineraries": [
-                        {
-                            "duration": "PT5H",
-                            "segments": [
-                                {
-                                    "departure": {"iataCode": origin, "at": "2024-07-01T10:00:00"},
-                                    "arrival": {"iataCode": destination, "at": "2024-07-01T15:00:00"},
-                                    "carrierCode": "MO",
-                                    "number": "123",
-                                    "duration": "PT5H"
-                                }
-                            ]
-                        }
-                    ],
-                    "price": {"total": "100.00", "currency": "USD"}
-                }
-            ]
+        response = amadeus.reference_data.locations.get(
+            keyword=city_name, subType="CITY"
+        )
+        locations = response.data
+        if locations:
+            return locations[0]["iataCode"]
+        return None
+    except ResponseError as e:
+        print(f"[Amadeus City Lookup Error] {e}")
+        return None
+
+
+def search_flights(origin: str, destination: str, departure_date: str):
+    """
+    Search for flights using Amadeus API or mock data.
+    """
+    if USE_MOCK_FLIGHT_SEARCH:
+        print("Using mock flight search data due to sandbox or limited API plan.")
+
+        try:
+            departure_datetime = datetime.strptime(departure_date, "%Y-%m-%d")
+        except ValueError:
+            print(f"[Mock Flight Search] Invalid departure_date format: {departure_date}")
+            return {"error": "Invalid date format. Use YYYY-MM-DD."}
+
+        arrival_datetime = departure_datetime + timedelta(hours=2)
+
+        return [
+            {
+                "type": "flight-offer",
+                "id": "mock1",
+                "source": "MOCK",
+                "itineraries": [
+                    {
+                        "duration": "PT2H",
+                        "segments": [
+                            {
+                                "departure": {"iataCode": origin, "at": departure_datetime.isoformat()},
+                                "arrival": {"iataCode": destination, "at": arrival_datetime.isoformat()},
+                                "carrierCode": "MO",
+                                "number": "123",
+                                "duration": "PT2H"
+                            }
+                        ]
+                    }
+                ],
+                "price": {"total": "100.00", "currency": "USD"}
+            }
+        ]
+
+    try:
         response = amadeus.shopping.flight_offers_search.get(
             originLocationCode=origin,
             destinationLocationCode=destination,
@@ -41,12 +85,10 @@ def search_flights(origin, destination, departure_date):
             max=5
         )
         return response.data
-    except ResponseError as error:
-        print(f"[Amadeus Error] {error}")
-        return None
-
-import os
-
+    except ResponseError as e:
+        print(f"[Amadeus Flight Search Error] {e}")
+        return {"error": str(e)}
+        
 valid_city_codes_cache = None
 USE_MOCK_HOTEL_SEARCH = os.getenv("USE_MOCK_HOTEL_SEARCH", "false").lower() == "true"
 
