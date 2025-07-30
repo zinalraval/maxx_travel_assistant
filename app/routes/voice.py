@@ -7,6 +7,7 @@ from datetime import datetime
 from dateutil import parser as date_parser
 from pydantic import BaseModel
 import logging
+from dateutil.relativedelta import relativedelta
 
 router = APIRouter()
 
@@ -94,8 +95,8 @@ def extract_info(text: str):
             parsed_date = date_parser.parse(date_match.group(1), fuzzy=True)
             # Ensure correct year
             now = datetime.now()
-            if parsed_date.year < now.year:
-                parsed_date = parsed_date.replace(year=now.year)
+            if parsed_date < now and (now - parsed_date).days < 180:
+                parsed_date += relativedelta(years=1)
             date_str = parsed_date.strftime("%Y-%m-%d")
         except Exception as e:
             logger.warning(f"Date parsing failed: {e}")
