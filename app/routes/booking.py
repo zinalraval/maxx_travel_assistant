@@ -64,6 +64,16 @@ def get_flights(
     except Exception as e:
         logger.error(f"Error searching flights: {e}")
         return {"error": "Failed to search flights"}
+@router.post("/validate-flight-offer")
+async def validate_flight_offer_route(flight_offer: dict = Body(...)):
+    try:
+        validated_offer = amadeus_service.validate_flight_offer(flight_offer)
+        return {"success": True, "validated_offer": validated_offer}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Validation failed: {str(e)}"
+        )
         
 @router.post("/pay")
 def initiate_payment(payment_request: PaymentRequest):
