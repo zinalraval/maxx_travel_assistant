@@ -17,6 +17,10 @@ class BookingCreate(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+class FlightOfferValidationRequest(BaseModel):
+    flight_offer: Dict[str, Any]
+    session_id: str
+
 class FlightBookingRequest(BaseModel):
     order_data: Dict[str, Any]
     travelers: List[Dict[str, Any]]
