@@ -84,7 +84,7 @@ def search_flights(origin: str, destination: str, departure_date: str):
         ]
 
     # Real Amadeus API call
-    print("✅ Using Amadeus flight search (USE_MOCK_FLIGHT_SEARCH=false)")
+    print("Using Amadeus flight search (USE_MOCK_FLIGHT_SEARCH=false)")
     try:
         response = amadeus.shopping.flight_offers_search.get(
             originLocationCode=origin,
@@ -155,7 +155,7 @@ def search_hotels(city_code=None, check_in_date=None, check_out_date=None, adult
         }
 
         response = amadeus.shopping.hotel_offers_search.get(**params)
-        print(f"✅ Amadeus responded: {response.status_code}")
+        print(f"Amadeus responded: {response.status_code}")
 
         if not response.data:
             print(f"[Amadeus Hotel Search] ⚠️ No hotel data returned.")
