@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Query, Depends, Request, Body
+from fastapi import APIRouter, Query, Depends, Request, Body, HTTPException, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from app.services.stripe_service import create_checkout_session
-from app.services.amadeus_service import search_flights, search_hotels, create_flight_order, create_hotel_booking
+from app.services.amadeus_service import search_flights, search_hotels, create_flight_order, create_hotel_booking, validate_flight_offer
 from app.services.calendar_service import create_event
 from app.db.crud import create_booking, update_booking_payment_status
 from app.db.session import SessionLocal
@@ -12,10 +12,17 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 import logging
 
-from app.services.amadeus_service import get_valid_city_codes
-
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+CITY_CODE_MAP = {
+    "LON": "LHR", "NYC": "JFK", "PAR": "CDG",
+    "DEL": "DEL", "BOM": "BOM", "DXB": "DXB",
+    "IST": "IST", "MAN": "MAN", "SFO": "SFO", "SIN": "SIN"
+}
+
+def normalize_city_code(code: str) -> str:
+    return CITY_CODE_MAP.get(code.upper(), code.upper())
 
 def get_db():
     db = SessionLocal()
@@ -35,46 +42,36 @@ def get_flights(
     session_id: str = Query(...)
 ):
     try:
-        # Normalize common city codes
-        city_code_map = {
-            "LON": "LHR", "NYC": "JFK", "PAR": "CDG",
-            "DEL": "DEL", "BOM": "BOM", "DXB": "DXB",
-            "IST": "IST", "MAN": "MAN", "SFO": "SFO", "SIN": "SIN"
-        }
-        normalized_origin = city_code_map.get(origin.upper(), origin.upper())
-        normalized_destination = city_code_map.get(destination.upper(), destination.upper())
-
-        # Ensure date is not in the past
+        normalized_origin = normalize_city_code(origin)
+        normalized_destination = normalize_city_code(destination)
         try:
             travel_date = datetime.strptime(date, "%Y-%m-%d").date()
             today = datetime.utcnow().date()
             if travel_date < today:
                 logger.warning(f"Past date provided: {date}")
-                return {"error": f"Cannot search flights in the past: {date}"}
+                raise HTTPException(status_code=400, detail=f"Cannot search flights in the past: {date}")
         except Exception as date_error:
             logger.error(f"Invalid date format: {date} - {date_error}")
-            return {"error": "Invalid date format. Use YYYY-MM-DD."}
-
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
         flights = search_flights(normalized_origin, normalized_destination, date)
         if not flights:
             logger.warning(f"No flights found for {normalized_origin} to {normalized_destination} on {date}")
-            return {"error": f"No flights found for {normalized_origin} to {normalized_destination} on {date}"}
-
+            raise HTTPException(status_code=404, detail=f"No flights found for {normalized_origin} to {normalized_destination} on {date}")
         return {"flights": flights}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error searching flights: {e}")
-        return {"error": "Failed to search flights"}
+        raise HTTPException(status_code=500, detail="Failed to search flights")
+
 @router.post("/validate-flight-offer")
 async def validate_flight_offer_route(flight_offer: dict = Body(...)):
     try:
-        validated_offer = amadeus_service.validate_flight_offer(flight_offer)
+        validated_offer = validate_flight_offer(flight_offer)
         return {"success": True, "validated_offer": validated_offer}
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Validation failed: {str(e)}"
-        )
-        
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Validation failed: {str(e)}")
+
 @router.post("/pay")
 def initiate_payment(payment_request: PaymentRequest):
     try:
@@ -83,10 +80,10 @@ def initiate_payment(payment_request: PaymentRequest):
             return {"checkout_url": url}
         else:
             logger.error("Payment session could not be created.")
-            return {"error": "Payment session could not be created."}
+            raise HTTPException(status_code=500, detail="Payment session could not be created.")
     except Exception as e:
         logger.error(f"Error initiating payment: {e}")
-        return {"error": "Failed to initiate payment"}
+        raise HTTPException(status_code=500, detail="Failed to initiate payment")
 
 @router.get("/hotels")
 def get_hotels(
@@ -97,57 +94,53 @@ def get_hotels(
     session_id: str = Query(None)
 ):
     try:
-        # Normalize city_code for known aliases
-        city_code_map = {
-            "LON": "LHR",  # London Heathrow instead of Gatwick
-            "NYC": "JFK",  # New York JFK
-            "DEL": "DEL",
-            "BOM": "BOM",
-            "DXB": "DXB",
-            "PAR": "CDG",  # Paris Charles de Gaulle
-            "IST": "IST",
-            "MAN": "MAN",
-            "SFO": "SFO",
-            "SIN": "SIN"
-        }
-        normalized_city_code = city_code_map.get(city_code.upper(), city_code.upper())
-
+        normalized_city_code = normalize_city_code(city_code)
         hotels = search_hotels(normalized_city_code, check_in_date, check_out_date, adults)
         if not hotels:
             logger.warning(f"No hotels found for city {normalized_city_code} from {check_in_date} to {check_out_date}")
-            return {"error": "No hotels found"}
+            raise HTTPException(status_code=404, detail="No hotels found")
         return {"hotels": hotels}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error searching hotels: {e}")
-        return {"error": f"Exception occurred: {str(e)}"}
+        raise HTTPException(status_code=500, detail=f"Exception occurred: {str(e)}")
 
 @router.post("/flight-book")
 def book_flight(flight_booking: FlightBookingRequest = Body(...), session_id: str = Query(...)):
     try:
+        # Validate the flight offer before booking
+        try:
+            validate_flight_offer(flight_booking.order_data)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Flight offer validation failed: {str(e)}")
         logger.info(f"Booking flight with order_data: {flight_booking.order_data}")
         logger.info(f"Travelers: {flight_booking.travelers}")
         result = create_flight_order(flight_booking.order_data, flight_booking.travelers)
         logger.info(f"Flight booking result: {result}")
         if not result:
             logger.error("Flight booking failed")
-            return {"error": "Flight booking failed"}
+            raise HTTPException(status_code=500, detail="Flight booking failed")
         return {"booking": result}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Exception during flight booking: {e}")
-        return {"error": "Flight booking exception occurred"}
+        raise HTTPException(status_code=500, detail="Flight booking exception occurred")
 
 @router.post("/hotel-book")
 def book_hotel(hotel_booking: HotelBookingRequest = Body(...), session_id: str = Query(...)):
     try:
-        # Assuming payments info is not available, pass None or handle accordingly
         result = create_hotel_booking(hotel_booking.booking_data, hotel_booking.guests, None)
         if not result:
             logger.error("Hotel booking failed")
-            return {"error": "Hotel booking failed"}
+            raise HTTPException(status_code=500, detail="Hotel booking failed")
         return {"booking": result}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Exception during hotel booking: {e}")
-        return {"error": "Hotel booking exception occurred"}
+        raise HTTPException(status_code=500, detail="Hotel booking exception occurred")
 
 @router.post("/confirm")
 def confirm_booking(booking: BookingCreate = Body(...), db: Session = Depends(get_db)):
@@ -157,7 +150,7 @@ def confirm_booking(booking: BookingCreate = Body(...), db: Session = Depends(ge
         return {"message": "Booking stored", "booking_id": saved.id}
     except Exception as e:
         logger.error(f"Error confirming booking: {e}")
-        return {"error": "Failed to confirm booking"}
+        raise HTTPException(status_code=500, detail="Failed to confirm booking")
 
 @router.post("/stripe-webhook")
 async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
@@ -180,4 +173,4 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         return {"status": "success"}
     except Exception as e:
         logger.error(f"Stripe webhook error: {e}")
-        return {"error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
