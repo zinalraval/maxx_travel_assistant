@@ -40,18 +40,17 @@ def city_to_iata_code(city_name: str) -> Optional[str]:
 
 def search_flights(origin: str, destination: str, departure_date: str):
     """
-    Search for flights using Amadeus or fallback mock data.
+    Search for flights using Amadeus API or mock data based on env.
     """
     if USE_MOCK_FLIGHT_SEARCH:
         print("🔁 Using mock flight search data (USE_MOCK_FLIGHT_SEARCH=true)")
-
         try:
             departure_datetime = datetime.strptime(departure_date, "%Y-%m-%d")
         except ValueError:
-            return {"error": "Invalid departure date format. Use YYYY-MM-DD."}
-
+            print(f"[Mock Flight Search] Invalid departure_date format: {departure_date}")
+            return {"error": "Invalid date format. Use YYYY-MM-DD."}
+        
         arrival_datetime = departure_datetime + timedelta(hours=2)
-
         return [
             {
                 "type": "flight-offer",
@@ -72,45 +71,21 @@ def search_flights(origin: str, destination: str, departure_date: str):
                                 },
                                 "carrierCode": "MO",
                                 "number": "123",
-                                "aircraft": {"code": "321"},
                                 "duration": "PT2H"
                             }
                         ]
                     }
                 ],
                 "price": {
-                    "currency": "USD",
                     "total": "100.00",
-                    "base": "85.00"
-                },
-                "travelerPricings": [
-                    {
-                        "travelerId": "1",
-                        "fareOption": "STANDARD",
-                        "price": {
-                            "currency": "USD",
-                            "total": "100.00",
-                            "base": "85.00"
-                        },
-                        "fareDetailsBySegment": [
-                            {
-                                "segmentId": "1",
-                                "cabin": "ECONOMY",
-                                "fareBasis": "Y",
-                                "class": "Y",
-                                "includedCheckedBags": {
-                                    "quantity": 1
-                                }
-                            }
-                        ]
-                    }
-                ]
+                    "currency": "USD"
+                }
             }
         ]
 
-    # Actual Amadeus request
+    # Real Amadeus API call
+    print("✅ Using Amadeus flight search (USE_MOCK_FLIGHT_SEARCH=false)")
     try:
-        print("🌐 Querying Amadeus API (real response)...")
         response = amadeus.shopping.flight_offers_search.get(
             originLocationCode=origin,
             destinationLocationCode=destination,
@@ -120,7 +95,7 @@ def search_flights(origin: str, destination: str, departure_date: str):
         )
         return response.data
     except ResponseError as e:
-        print(f"[Amadeus API Error] {e}")
+        print(f"[Amadeus Flight Search Error] {e}")
         return {"error": str(e)}
         
 valid_city_codes_cache = None
