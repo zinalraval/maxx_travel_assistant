@@ -42,7 +42,7 @@ def city_to_iata_code(city_name: str) -> Optional[str]:
         return None
 
 
-def search_flights(origin: str, destination: str, departure_date: str):
+def search_flights(origin: str, destination: str, departure_date: str, adults: int = 1, children: int = 0):
     """
     Search for flights using Amadeus API or mock data based on env.
     """
@@ -92,7 +92,7 @@ def search_flights(origin: str, destination: str, departure_date: str):
             originLocationCode=origin,
             destinationLocationCode=destination,
             departureDate=departure_date,
-            adults=1,
+            adults=adults,
             max=5
         )
         return response.data
