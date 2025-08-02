@@ -2,7 +2,21 @@ from fastapi import APIRouter, Query, Depends, Request, Body, HTTPException, sta
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from app.services.stripe_service import create_checkout_session
-from app.services.amadeus_service import search_flights, search_hotels, create_flight_order, create_hotel_booking, validate_flight_offer
+from app.services.amadeus_service import (
+    search_flights,
+    search_hotels,
+    create_flight_order,
+    create_hotel_booking,
+    validate_flight_offer,
+    flight_inspiration_search,
+    flight_cheapest_date_search,
+    flight_upselling_search,
+    flight_seatmap_display_get,
+    flight_seatmap_display_post,
+    trip_purpose_prediction,
+    transfer_search,
+    transfer_booking,
+)
 from app.services.calendar_service import create_event
 from app.db.crud import create_booking, update_booking_payment_status
 from app.db.session import SessionLocal
@@ -39,6 +53,8 @@ def get_flights(
     origin: str = Query(..., alias="originLocationCode"),
     destination: str = Query(..., alias="destinationLocationCode"),
     date: str = Query(..., alias="departureDate"),
+    adults: int = Query(1),
+    children: int = Query(0),
     session_id: str = Query(...)
 ):
     try:
@@ -53,7 +69,7 @@ def get_flights(
         except Exception as date_error:
             logger.error(f"Invalid date format: {date} - {date_error}")
             raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
-        flights = search_flights(normalized_origin, normalized_destination, date)
+        flights = search_flights(normalized_origin, normalized_destination, date, adults=adults, children=children)
         if not flights:
             logger.warning(f"No flights found for {normalized_origin} to {normalized_destination} on {date}")
             raise HTTPException(status_code=404, detail=f"No flights found for {normalized_origin} to {normalized_destination} on {date}")
@@ -63,6 +79,28 @@ def get_flights(
     except Exception as e:
         logger.error(f"Error searching flights: {e}")
         raise HTTPException(status_code=500, detail="Failed to search flights")
+
+@router.get("/flight-inspiration")
+def get_flight_inspiration(origin: str = Query(...)):
+    try:
+        data = flight_inspiration_search(origin)
+        if not data:
+            raise HTTPException(status_code=404, detail="No flight inspiration data found")
+        return {"flight_inspiration": data}
+    except Exception as e:
+        logger.error(f"Error in flight inspiration search: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get flight inspiration")
+
+@router.get("/flight-cheapest-date")
+def get_flight_cheapest_date(origin: str = Query(...), destination: str = Query(...)):
+    try:
+        data = flight_cheapest_date_search(origin, destination)
+        if not data:
+            raise HTTPException(status_code=404, detail="No cheapest date data found")
+        return {"flight_cheapest_date": data}
+    except Exception as e:
+        logger.error(f"Error in flight cheapest date search: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get flight cheapest date")
 
 @router.post("/validate-flight-offer")
 async def validate_flight_offer_route(flight_offer: dict = Body(...)):
@@ -91,11 +129,12 @@ def get_hotels(
     check_in_date: str,
     check_out_date: str,
     adults: int = 1,
+    children: int = 0,
     session_id: str = Query(None)
 ):
     try:
         normalized_city_code = normalize_city_code(city_code)
-        hotels = search_hotels(normalized_city_code, check_in_date, check_out_date, adults)
+        hotels = search_hotels(normalized_city_code, check_in_date, check_out_date, adults + children)
         if not hotels:
             logger.warning(f"No hotels found for city {normalized_city_code} from {check_in_date} to {check_out_date}")
             raise HTTPException(status_code=404, detail="No hotels found")
@@ -141,6 +180,72 @@ def book_hotel(hotel_booking: HotelBookingRequest = Body(...), session_id: str =
     except Exception as e:
         logger.error(f"Exception during hotel booking: {e}")
         raise HTTPException(status_code=500, detail="Hotel booking exception occurred")
+
+@router.get("/flight-order/{order_id}")
+def get_flight_order(order_id: str):
+    try:
+        data = get_flight_order(order_id)
+        if "error" in data:
+            raise HTTPException(status_code=404, detail=data["error"])
+        return {"flight_order": data}
+    except Exception as e:
+        logger.error(f"Error getting flight order: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get flight order")
+
+@router.put("/flight-order/{order_id}")
+def update_flight_order_route(order_id: str, body: dict = Body(...)):
+    try:
+        data = update_flight_order(order_id, body)
+        if "error" in data:
+            raise HTTPException(status_code=404, detail=data["error"])
+        return {"updated_flight_order": data}
+    except Exception as e:
+        logger.error(f"Error updating flight order: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update flight order")
+
+@router.delete("/flight-order/{order_id}")
+def delete_flight_order_route(order_id: str):
+    try:
+        data = delete_flight_order(order_id)
+        if "error" in data:
+            raise HTTPException(status_code=404, detail=data["error"])
+        return {"deleted_flight_order": data}
+    except Exception as e:
+        logger.error(f"Error deleting flight order: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete flight order")
+
+@router.get("/hotel-order/{order_id}")
+def get_hotel_order(order_id: str):
+    try:
+        data = get_hotel_order(order_id)
+        if "error" in data:
+            raise HTTPException(status_code=404, detail=data["error"])
+        return {"hotel_order": data}
+    except Exception as e:
+        logger.error(f"Error getting hotel order: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get hotel order")
+
+@router.put("/hotel-order/{order_id}")
+def update_hotel_order_route(order_id: str, body: dict = Body(...)):
+    try:
+        data = update_hotel_order(order_id, body)
+        if "error" in data:
+            raise HTTPException(status_code=404, detail=data["error"])
+        return {"updated_hotel_order": data}
+    except Exception as e:
+        logger.error(f"Error updating hotel order: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update hotel order")
+
+@router.delete("/hotel-order/{order_id}")
+def delete_hotel_order_route(order_id: str):
+    try:
+        data = delete_hotel_order(order_id)
+        if "error" in data:
+            raise HTTPException(status_code=404, detail=data["error"])
+        return {"deleted_hotel_order": data}
+    except Exception as e:
+        logger.error(f"Error deleting hotel order: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete hotel order")
 
 @router.post("/confirm")
 def confirm_booking(booking: BookingCreate = Body(...), db: Session = Depends(get_db)):

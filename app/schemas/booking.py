@@ -29,3 +29,32 @@ class HotelBookingRequest(BaseModel):
     booking_data: Dict[str, Any]
     guests: List[Dict[str, Any]]
     payments: List[Dict[str, Any]]
+
+class FlightInspirationRequest(BaseModel):
+    origin: str
+
+class FlightCheapestDateRequest(BaseModel):
+    origin: str
+    destination: str
+
+class FlightUpsellingRequest(BaseModel):
+    body: Dict[str, Any]
+
+class FlightSeatmapRequest(BaseModel):
+    flight_order_id: str
+
+class FlightSeatmapPostRequest(BaseModel):
+    body: Dict[str, Any]
+
+class TripPurposePredictionRequest(BaseModel):
+    origin: str
+    destination: str
+    departure_date: str
+    return_date: str
+
+class TransferSearchRequest(BaseModel):
+    body: Dict[str, Any]
+
+class TransferBookingRequest(BaseModel):
+    body: Dict[str, Any]
+    offer_id: str

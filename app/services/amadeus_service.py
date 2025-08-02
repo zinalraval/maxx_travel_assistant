@@ -14,8 +14,8 @@ logging.basicConfig(level=logging.INFO)
 AMADEUS_CLIENT_ID = os.getenv("AMADEUS_CLIENT_ID")
 AMADEUS_CLIENT_SECRET = os.getenv("AMADEUS_CLIENT_SECRET")
 AMADEUS_ENV = os.getenv("AMADEUS_ENV", "test")  # or "production"
-USE_MOCK_FLIGHT_SEARCH = os.getenv("USE_MOCK_FLIGHT_SEARCH", "true").lower() == "true"
-USE_MOCK_HOTEL_SEARCH = os.getenv("USE_MOCK_HOTEL_SEARCH", "true").lower() == "true"
+USE_MOCK_FLIGHT_SEARCH = os.getenv("USE_MOCK_FLIGHT_SEARCH", "false").lower() == "true"
+USE_MOCK_HOTEL_SEARCH = os.getenv("USE_MOCK_HOTEL_SEARCH", "false").lower() == "true"
 
 amadeus = Client(
     client_id=AMADEUS_CLIENT_ID,
@@ -304,3 +304,124 @@ def create_hotel_booking(booking_data, guests, payments):
             except Exception:
                 logging.error("No response data available")
         return None
+
+# Additional Amadeus API endpoints implementation
+
+def flight_inspiration_search(origin: str):
+    try:
+        response = amadeus.shopping.flight_destinations.get(origin=origin)
+        return response.data
+    except ResponseError as error:
+        logging.error(f"[Flight Inspiration Search Error] {error}")
+        return {"error": str(error)}
+
+def flight_cheapest_date_search(origin: str, destination: str):
+    try:
+        response = amadeus.shopping.flight_dates.get(origin=origin, destination=destination)
+        return response.data
+    except ResponseError as error:
+        logging.error(f"[Flight Cheapest Date Search Error] {error}")
+        return {"error": str(error)}
+
+def flight_upselling_search(body: dict):
+    try:
+        response = amadeus.shopping.flight_offers.upselling.post(body)
+        return response.data
+    except ResponseError as error:
+        logging.error(f"[Flight Upselling Search Error] {error}")
+        return {"error": str(error)}
+
+def flight_seatmap_display_get(flight_order_id: str):
+    try:
+        response = amadeus.shopping.seatmaps.get(**{"flight-orderId": flight_order_id})
+        return response.data
+    except ResponseError as error:
+        logging.error(f"[Flight Seatmap Display GET Error] {error}")
+        return {"error": str(error)}
+
+def flight_seatmap_display_post(body: dict):
+    try:
+        response = amadeus.shopping.seatmaps.post(body)
+        return response.data
+    except ResponseError as error:
+        logging.error(f"[Flight Seatmap Display POST Error] {error}")
+        return {"error": str(error)}
+
+def trip_purpose_prediction(origin: str, destination: str, departure_date: str, return_date: str):
+    try:
+        response = amadeus.travel.predictions.trip_purpose.get(
+            originLocationCode=origin,
+            destinationLocationCode=destination,
+            departureDate=departure_date,
+            returnDate=return_date
+        )
+        return response.data
+    except ResponseError as error:
+        logging.error(f"[Trip Purpose Prediction Error] {error}")
+        return {"error": str(error)}
+
+def transfer_search(body: dict):
+    try:
+        response = amadeus.shopping.transfer_offers.post(body)
+        return response.data
+    except ResponseError as error:
+        logging.error(f"[Transfer Search Error] {error}")
+        return {"error": str(error)}
+
+def transfer_booking(body: dict, offer_id: str):
+    try:
+        response = amadeus.ordering.transfer_orders.post(body, offerId=offer_id)
+        return response.data
+    except ResponseError as error:
+        logging.error(f"[Transfer Booking Error] {error}")
+        return {"error": str(error)}
+
+# Booking order management
+
+def get_flight_order(order_id: str):
+    try:
+        response = amadeus.booking.flight_order(order_id).get()
+        return response.data
+    except ResponseError as error:
+        logging.error(f"[Get Flight Order Error] {error}")
+        return {"error": str(error)}
+
+def update_flight_order(order_id: str, body: dict):
+    try:
+        response = amadeus.booking.flight_order(order_id).put(body)
+        return response.data
+    except ResponseError as error:
+        logging.error(f"[Update Flight Order Error] {error}")
+        return {"error": str(error)}
+
+def delete_flight_order(order_id: str):
+    try:
+        response = amadeus.booking.flight_order(order_id).delete()
+        return response.data
+    except ResponseError as error:
+        logging.error(f"[Delete Flight Order Error] {error}")
+        return {"error": str(error)}
+
+def get_hotel_order(order_id: str):
+    try:
+        response = amadeus.booking.hotel_order(order_id).get()
+        return response.data
+    except ResponseError as error:
+        logging.error(f"[Get Hotel Order Error] {error}")
+        return {"error": str(error)}
+
+def update_hotel_order(order_id: str, body: dict):
+    try:
+        response = amadeus.booking.hotel_order(order_id).put(body)
+        return response.data
+    except ResponseError as error:
+        logging.error(f"[Update Hotel Order Error] {error}")
+        return {"error": str(error)}
+
+def delete_hotel_order(order_id: str):
+    try:
+        response = amadeus.booking.hotel_order(order_id).delete()
+        return response.data
+    except ResponseError as error:
+        logging.error(f"[Delete Hotel Order Error] {error}")
+        return {"error": str(error)}
