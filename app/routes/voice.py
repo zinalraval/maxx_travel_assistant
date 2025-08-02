@@ -122,6 +122,7 @@ async def voice_webhook(request: Request):
         city = metadata.get("city")
         date_str = metadata.get("date")
         adults = metadata.get("adults", 1)
+        children = metadata.get("children", 0)
 
         if date_str:
             try:
@@ -150,7 +151,7 @@ async def voice_webhook(request: Request):
 
             resp = requests.get(
                 "https://maxx-travel-assistant.onrender.com/booking/flights",
-                params={"origin": origin_code, "destination": dest_code, "date": date_str, "session_id": session_id},
+                params={"originLocationCode": origin_code, "destinationLocationCode": dest_code, "departureDate": date_str, "adults": adults, "children": children, "session_id": session_id},
                 timeout=10
             )
             result = resp.json()
@@ -170,9 +171,9 @@ async def voice_webhook(request: Request):
             resp = requests.get(
                 "https://maxx-travel-assistant.onrender.com/booking/hotels",
                 params={
-                    "city_code": city_code,
-                    "check_in_date": date_str,
-                    "check_out_date": date_str,
+                    "cityCode": city_code,
+                    "checkInDate": date_str,
+                    "checkOutDate": date_str,
                     "adults": adults,
                     "session_id": session_id
                 },
